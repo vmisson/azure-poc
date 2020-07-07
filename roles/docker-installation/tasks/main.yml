@@ -1,0 +1,43 @@
+---
+  - name: dnf config-manager --add-repo=https://download.docker.com/linux/centos/docker-ce.repo
+    shell:  'dnf config-manager \
+      --add-repo \
+      https://download.docker.com/linux/centos/docker-ce.repo'
+
+  - name: dnf install https://download.docker.com/linux/centos/7/x86_64/stable/Packages/containerd.io-1.2.10-3.2.el7.x86_64.rpm
+    dnf: 
+      name: https://download.docker.com/linux/centos/7/x86_64/stable/Packages/containerd.io-1.2.10-3.2.el7.x86_64.rpm
+      state: present
+
+  - name: dnf install docker-ce
+    dnf:
+      name: docker-ce
+      state: latest
+
+  - name: systemctl start docker && systemctl enable docker 
+    service:
+      name: docker
+      state: started
+      enabled: yes
+
+  - name: dnf install python3-pip
+    dnf: 
+      name: python3-pip
+      state: latest
+
+  - name: pip3 install docker-compose 
+    pip: 
+      name: docker-compose
+
+  - name: usermod -aG docker vincent
+    user: 
+      name: vincent
+      groups: docker
+      append: yes
+  
+  - name: mkdir /srv/docker && chown root:docker /srv/docker
+    file:
+      path: /srv/docker
+      state: directory
+      group: docker
+      mode: '0775'

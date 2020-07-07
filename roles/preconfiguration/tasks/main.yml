@@ -1,0 +1,26 @@
+---
+  - name: dnf install epel-release
+    dnf:
+      name: epel-release
+      state: latest
+  
+  - name: dnf install fail2ban
+    dnf: 
+      name: fail2ban
+      state: latest
+
+  - name : systemctl start fail2ban && systemctl enable fail2ban
+    service: 
+      name: fail2ban
+      state: started
+      enabled: yes
+
+  - name : dnf install podman
+    dnf: 
+      name: podman
+      state: latest
+
+  - name: upgrade all packages
+    dnf:
+      name: "*"
+      state: latest

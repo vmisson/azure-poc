@@ -1,0 +1,9 @@
+---
+  - name: Azure instances configuration
+    hosts: all
+    gather_facts: false
+    become: true
+    any_errors_fatal: true
+
+    roles:
+      - preconfiguration
