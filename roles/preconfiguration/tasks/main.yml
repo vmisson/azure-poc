@@ -3,24 +3,82 @@
     dnf:
       name: epel-release
       state: latest
+    become: true
   
   - name: dnf install fail2ban
     dnf: 
       name: fail2ban
       state: latest
+    become: true
 
   - name : systemctl start fail2ban && systemctl enable fail2ban
     service: 
       name: fail2ban
       state: started
       enabled: yes
+    become: true
 
   - name : dnf install podman
     dnf: 
       name: podman
       state: latest
+    become: true
+
+  - name : dnf -y module disable container-tools
+    command:
+       dnf -y module disable container-tools
+    become: true
+
+  - name : dnf -y install 'dnf-command(copr)'
+    dnf: 
+      name: dnf-command(copr)
+      state: latest
+    become: true
+
+  - name : dnf -y copr enable rhcontainerbot/container-selinux
+    command:
+       dnf -y copr enable rhcontainerbot/container-selinux
+    become: true
+  
+  - name : curl -L -o /etc/yum.repos.d/devel:kubic:libcontainers:stable.repo https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/CentOS_8/devel:kubic:libcontainers:stable.repo
+    command: 
+      curl -L -o /etc/yum.repos.d/devel:kubic:libcontainers:stable.repo https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/CentOS_8/devel:kubic:libcontainers:stable.repo    
+    become: true
+
+  - name : dnf install podman
+    dnf: 
+      name: podman
+      state: latest
+    become: true
 
   - name: upgrade all packages
     dnf:
       name: "*"
       state: latest
+    become: true
+
+  - name: create directory if they don't exist
+    file:
+      path: "{{ item }}"
+      state: directory
+    with_items:
+      - ~/containers/nextcloud_db-volume
+      - ~/containers/nextcloud_app-volume
+      - ~/.config/systemd/user/
+  
+  # - name : podman pod create --name nextcloud -p 8080:80
+  #   command: 
+  #     podman pod create --name nextcloud -p 8080:80
+
+  - name : podman container run -d --pod nextcloud --name nextcloud_redis redis
+    command: 
+      podman container run -d --pod nextcloud --name nextcloud_redis redis
+
+  - name : podman container run -d --pod nextcloud --name nextcloud_db -e POSTGRES_USER="nextcloud" -e POSTGRES_PASSWORD="vcEbyro%&E83XxbM" -v /home/vincent/containers/nextcloud_db-volume:/var/lib/postgresql/data:Z postgres
+    command: 
+      podman container run -d --pod nextcloud --name nextcloud_db -e POSTGRES_USER="nextcloud" -e POSTGRES_PASSWORD="vcEbyro%&E83XxbM" -v /home/vincent/containers/nextcloud_db-volume:/var/lib/postgresql/data:Z postgres
+
+  - name : podman container run -d --pod nextcloud --name nextcloud_app -e POSTGRES_HOST="127.0.0.1" -e POSTGRES_DB="nextcloud" -e POSTGRES_USER="nextcloud" -e POSTGRES_PASSWORD="vcEbyro%&E83XxbM" -e NEXTCLOUD_ADMIN_USER="nextcloud" -e NEXTCLOUD_ADMIN_PASSWORD="fJXk#zuGgrBen3s$" -e NEXTCLOUD_TRUSTED_DOMAINS="nextcloudvincent.westeurope.cloudapp.azure.com" -e REDIS_HOST="127.0.0.1" -v /home/vincent/containers/nextcloud_app-volume:/var/www/html:Z nextcloud
+    command: 
+      podman container run -d --pod nextcloud --name nextcloud_app -e POSTGRES_HOST="127.0.0.1" -e POSTGRES_DB="nextcloud" -e POSTGRES_USER="nextcloud" -e POSTGRES_PASSWORD="vcEbyro%&E83XxbM" -e NEXTCLOUD_ADMIN_USER="nextcloud" -e NEXTCLOUD_ADMIN_PASSWORD="fJXk#zuGgrBen3s$" -e NEXTCLOUD_TRUSTED_DOMAINS="nextcloudvincent.westeurope.cloudapp.azure.com" -e REDIS_HOST="127.0.0.1" -v /home/vincent/containers/nextcloud_app-volume:/var/www/html:Z nextcloud
+  

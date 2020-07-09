@@ -11,10 +11,6 @@
       prompt: "Choose a prefix for all the resources"
       private: no
       default: "test"
-    - name: "instances_number"
-      prompt: "Choose a number of virtual machines to create"
-      private: no
-      default: 1
     - name: "vm_size"
       prompt: "Choose a size for azure virtual machines"
       private: no
@@ -31,10 +27,6 @@
       prompt: "Where can I find the admin public key ?"
       private: no
       default: "~/.ssh/id_rsa.pub"
-    - name: "local_ip"
-      prompt: "your local IP address (skip if you don't want to add 22 port to NSG)"
-      private: no
-      default: "skip"
     - name: "virtualnetwork_cidr"
       prompt: "Give a network CIDR for virtual network (large)"
       private: no
@@ -43,6 +35,10 @@
       prompt: "Give a subnet of that network"
       private: no
       default: "192.168.1.0/24"
+    - name: "dns_name"
+      prompt: "Give DNS name to public IP (skip if you don't want to DNS name)"
+      private: no
+      default: "nextcloudvincent"
   vars:
     - resourcegroup_name: "{{project_prefix}}-rg"
     - availabilityset_name: "{{project_prefix}}-avset"
@@ -80,7 +76,7 @@
         address_prefix_cidr: "{{subnet_cidr}}"
       register: subnet
 
-    - name: "Create {{securitygroup_name}} security rules (if local IP address was given)"
+    - name: "Create security rules 22 / 8080"
       azure_rm_securitygroup:
         name: "{{securitygroup_name}}"
         resource_group: "{{resourcegroup_name}}"
@@ -88,30 +84,40 @@
         rules:
           - name: 'AllowSSHFromYourOwnInternetIP'
             protocol: 'Tcp'
-            source_address_prefix: "{{local_ip}}"
             destination_port_range: 22
             access: Allow
-            priority: 1000
+            priority: 100
             direction: Inbound
-      when: local_ip | ipaddr
+          - name: 'AllowAppFromYourOwnInternetIP'
+            protocol: 'Tcp'
+            destination_port_range: 8080
+            access: Allow
+            priority: 110
+            direction: Inbound
 
-    - name: "Create a {{nic_root_name}}X network interface for each VM"
+    - name: "Create a {{nic_root_name}} network interface for each VM"
       azure_rm_networkinterface:
-        name: "{{nic_root_name}}{{item}}"
+        name: "{{nic_root_name}}"
         resource_group: "{{resourcegroup_name}}"
         virtual_network: "{{virtualnetwork_name}}"
         subnet_name: "{{subnet_name}}"
         security_group: "{{securitygroup_name}}"
         ip_configurations:
           - name: "ipconfig"
-            public_ip_address_name: "{{public_ip_name}}{{item}}"
+            public_ip_address_name: "{{public_ip_name}}"
             primary: True
-      with_sequence: count="{{instances_number}}"
 
-    - name: "Create {{vm_root_name}}X VM with existing NIC"
+    - name: Create a public dns name
+      azure_rm_publicipaddress:
+        resource_group: "{{resourcegroup_name}}"
+        name: "{{public_ip_name}}"
+        allocation_method: Dynamic
+        domain_name: "{{dns_name}}"
+
+    - name: "Create {{vm_root_name}} VM with existing NIC"
       azure_rm_virtualmachine:
         resource_group: "{{resourcegroup_name}}"
-        name: "{{vm_root_name}}{{item}}"
+        name: "{{vm_root_name}}"
         vm_size: "{{vm_size}}"
         managed_disk_type: "{{managed_disk_type}}"
         admin_username: "{{admin_username}}"
@@ -120,10 +126,9 @@
         ssh_public_keys:
           - path: "/home/{{admin_username}}/.ssh/authorized_keys"
             key_data: "{{lookup('file', '{{admin_pub_path}}') }}"
-        network_interface_names: "{{nic_root_name}}{{item}}"
+        network_interface_names: "{{nic_root_name}}"
         image:
           offer: CentOS
           publisher: OpenLogic
           sku: '8_2'
           version: latest
-      with_sequence: count="{{instances_number}}"
